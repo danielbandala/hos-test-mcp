@@ -35,8 +35,13 @@ embeddings = OpenAIEmbeddings(
 )
 vectordb = Chroma.from_documents(chunks, embeddings, persist_directory="db")
 
+# save the vector store to disk
+# vectordb.persist()
+
 # Retrieve relevant chunks based on a query
 query = "PDF title and section list"
+
+query = "Login/Logout, Certification of RODS, Data Diagnostics and Malfunctions"
 docs = vectordb.similarity_search(query, k=5)
 context = "\n\n".join(d.page_content for d in docs)
 
@@ -48,19 +53,32 @@ for i, doc in enumerate(docs):
 
 print("\n\n")
 
-prompt = f"""
-Validate this JSON: must have keys "title", "sections" (list of strings).
-Only use what's in context:
-{context}
+# prompt = f"""
+# Validate this JSON: must have keys "title", "sections" (list of strings).
+# Only use what's in context:
+# {context}
 
-Return ONLY valid JSON or an error JSON.
-Avoid repetition, be concise.
-"""
+# Return ONLY valid JSON or an error JSON.
+# Avoid repetition, be concise.
+# """
+
+messages = [
+    {"role": "system", "content": "You are a CCMTA (Canadian Council of Motor Transport Administrators) report validator that takes a text input from a pdf report chunk, structures the data and validates what the user asks."},
+    {"role": "user", "content": (
+        "Report chunk:\n\n" + context + "\n\n"
+        "Validate if the information is structured correctly, the parameters are in the right format, and the data is complete.\n"+
+        "Validate the table data against what is expected for that segment in the CCMTA report. Use most updated information\n"
+    )}
+]
 
 resp = llm_client.chat.completions.create(
-    model="gpt-4o-mini",
-    messages=[{"role":"user","content": prompt}],
-    max_tokens=300
+    model="gpt-4o-mini-search-preview",
+    messages=messages,
+    max_tokens=300,
+    web_search_options={
+        "search_context_size": "low",
+    },
+
 )
 print(resp.choices[0].message.content)
 
